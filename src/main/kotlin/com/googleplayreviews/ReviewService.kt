@@ -133,5 +133,27 @@ class ReviewService(credentials: GoogleCredentials) {
 
             languageMatch && unansweredMatch && searchMatch
         }
+
+        // Pure function: given pre-fetched pages of raw reviews (each paired with its
+        // nextPageToken), accumulates filtered results until `limit` is reached or pages
+        // are exhausted. Exposed here so it can be unit-tested without real API calls.
+        // `listReviews` uses the same logic in a live fetching loop.
+        fun accumulateFiltered(
+            pages: List<Pair<List<Review>, String?>>,
+            limit: Int,
+            language: String? = null,
+            unansweredOnly: Boolean = false,
+            searchText: String? = null
+        ): ReviewsPage {
+            val accumulated = mutableListOf<Review>()
+            for ((rawReviews, nextToken) in pages) {
+                accumulated.addAll(applyFilters(rawReviews, language, unansweredOnly, searchText))
+                if (limit > 0 && accumulated.size >= limit) {
+                    return ReviewsPage(accumulated.take(limit), nextPageToken = nextToken)
+                }
+                if (nextToken == null) return ReviewsPage(accumulated, nextPageToken = null)
+            }
+            return ReviewsPage(accumulated, nextPageToken = null)
+        }
     }
 }
