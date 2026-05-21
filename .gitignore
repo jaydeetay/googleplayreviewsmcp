@@ -3,3 +3,7 @@ build/
 .idea/
 *.iml
 .DS_Store
+out/
+local.properties
+*-service-account*.json
+*-credentials*.json
