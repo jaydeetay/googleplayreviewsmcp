@@ -1,0 +1,6 @@
+# An MCP server to read and reply to Google Play Reviews
+
+NOTE: Google's APIs truly suck - this one only returns reviews from the last 7 days.  They have some weak justification, but it's really just crap on their part. They make little effort to document it, but there is this:
+
+https://support.google.com/googleplay/android-developer/thread/239806165/google-play-api-list-reviews-only-returns-last-7-days-of-reviews-and-does-not-return-pagination
+
