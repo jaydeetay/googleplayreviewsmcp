@@ -25,25 +25,37 @@ class ReviewService(credentials: GoogleCredentials) {
     suspend fun listReviews(
         packageName: String,
         pageToken: String? = null,
-        maxResults: Int = 100,
+        limit: Int = 100,
         language: String? = null,
         unansweredOnly: Boolean = false,
         searchText: String? = null,
         translationLanguage: String? = null
     ): ReviewsPage = withContext(Dispatchers.IO) {
-        val request = publisher.reviews().list(packageName)
-            .setMaxResults(maxResults.toLong())
-        pageToken?.let { request.setToken(it) }
-        translationLanguage?.let { request.setTranslationLanguage(it) }
+        val accumulated = mutableListOf<Review>()
+        var currentToken = pageToken
 
-        val response = request.execute()
-        val allReviews = (response.reviews ?: emptyList<com.google.api.services.androidpublisher.model.Review>()).map { mapReview(it) }
-        val filtered = applyFilters(allReviews, language, unansweredOnly, searchText)
+        while (true) {
+            val request = publisher.reviews().list(packageName)
+            currentToken?.let { request.setToken(it) }
+            translationLanguage?.let { request.setTranslationLanguage(it) }
 
-        ReviewsPage(
-            reviews = filtered,
-            nextPageToken = response.tokenPagination?.nextPageToken
-        )
+            val response = request.execute()
+            val rawReviews = (response.reviews
+                ?: emptyList<com.google.api.services.androidpublisher.model.Review>())
+                .map { mapReview(it) }
+            val apiNextToken = response.tokenPagination?.nextPageToken
+
+            accumulated.addAll(applyFilters(rawReviews, language, unansweredOnly, searchText))
+
+            if (limit > 0 && accumulated.size >= limit) {
+                return@withContext ReviewsPage(accumulated.take(limit), nextPageToken = apiNextToken)
+            }
+
+            if (apiNextToken == null) break
+            currentToken = apiNextToken
+        }
+
+        ReviewsPage(reviews = accumulated, nextPageToken = null)
     }
 
     suspend fun getReview(packageName: String, reviewId: String): Review = withContext(Dispatchers.IO) {

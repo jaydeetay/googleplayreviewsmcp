@@ -38,9 +38,8 @@ object McpServer {
         server.addTool(
             name = "list_reviews",
             description = "Fetch reviews for a Google Play app with optional filters. " +
-                "Note: language, unansweredOnly, and searchText are applied client-side after " +
-                "fetching up to maxResults reviews from the API, so the returned list may be " +
-                "smaller than maxResults when filters are active.",
+                "Automatically paginates through API pages until the requested number of " +
+                "filtered results is accumulated or pages are exhausted.",
             inputSchema = Tool.Input(
                 properties = buildJsonObject {
                     putJsonObject("packageName") {
@@ -51,9 +50,9 @@ object McpServer {
                         put("type", "string")
                         put("description", "Pagination token from a previous list_reviews response")
                     }
-                    putJsonObject("maxResults") {
+                    putJsonObject("limit") {
                         put("type", "integer")
-                        put("description", "Max reviews to fetch (default 100, max 4096)")
+                        put("description", "Max filtered reviews to return (default 100); 0 means no limit")
                     }
                     putJsonObject("language") {
                         put("type", "string")
@@ -82,7 +81,7 @@ object McpServer {
                 val page = reviewService.listReviews(
                     packageName = packageName,
                     pageToken = args.requireString("pageToken"),
-                    maxResults = args["maxResults"]?.jsonPrimitive?.intOrNull ?: 100,
+                    limit = args["limit"]?.jsonPrimitive?.intOrNull ?: 100,
                     language = args.requireString("language"),
                     unansweredOnly = args["unansweredOnly"]?.jsonPrimitive?.booleanOrNull ?: false,
                     searchText = args.requireString("searchText"),

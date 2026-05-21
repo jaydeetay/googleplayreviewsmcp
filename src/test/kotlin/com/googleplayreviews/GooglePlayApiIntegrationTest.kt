@@ -16,14 +16,14 @@ class GooglePlayApiIntegrationTest {
 
     @Test
     fun `can list reviews`() = runBlocking {
-        val page = reviewService.listReviews(packageName, maxResults = 5)
+        val page = reviewService.listReviews(packageName, limit = 5)
         assertNotNull(page)
         assertTrue(page.reviews.isNotEmpty(), "Expected at least one review")
     }
 
     @Test
     fun `can get a single review`() = runBlocking {
-        val page = reviewService.listReviews(packageName, maxResults = 1)
+        val page = reviewService.listReviews(packageName, limit = 1)
         val reviewId = page.reviews.first().reviewId
         val review = reviewService.getReview(packageName, reviewId)
         assertNotNull(review)
@@ -32,7 +32,7 @@ class GooglePlayApiIntegrationTest {
 
     @Test
     fun `language filter returns only matching reviews`() = runBlocking {
-        val page = reviewService.listReviews(packageName, maxResults = 50, language = "en")
+        val page = reviewService.listReviews(packageName, limit = 50, language = "en")
         assertTrue(
             page.reviews.all { it.reviewerLanguage.equals("en", ignoreCase = true) },
             "All reviews should have reviewerLanguage=en"
