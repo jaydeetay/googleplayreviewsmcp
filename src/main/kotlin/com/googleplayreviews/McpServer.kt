@@ -13,6 +13,9 @@ import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 
+private fun JsonObject.requireString(key: String): String? =
+    this[key]?.jsonPrimitive?.contentOrNull
+
 object McpServer {
 
     private val json = Json { encodeDefaults = false }
@@ -34,7 +37,10 @@ object McpServer {
     private fun registerListReviews(server: Server, reviewService: ReviewService) {
         server.addTool(
             name = "list_reviews",
-            description = "Fetch reviews for a Google Play app with optional client-side filters.",
+            description = "Fetch reviews for a Google Play app with optional filters. " +
+                "Note: language, unansweredOnly, and searchText are applied client-side after " +
+                "fetching up to maxResults reviews from the API, so the returned list may be " +
+                "smaller than maxResults when filters are active.",
             inputSchema = Tool.Input(
                 properties = buildJsonObject {
                     putJsonObject("packageName") {
@@ -70,20 +76,20 @@ object McpServer {
             )
         ) { request ->
             val args = request.arguments
-            runCatching {
-                val packageName = args["packageName"]?.jsonPrimitive?.contentOrNull
-                    ?: return@addTool errorResult("packageName is required")
+            safeToolCall("list_reviews") {
+                val packageName = args.requireString("packageName")
+                    ?: return@safeToolCall errorResult("packageName is required")
                 val page = reviewService.listReviews(
                     packageName = packageName,
-                    pageToken = args["pageToken"]?.jsonPrimitive?.contentOrNull,
+                    pageToken = args.requireString("pageToken"),
                     maxResults = args["maxResults"]?.jsonPrimitive?.intOrNull ?: 100,
-                    language = args["language"]?.jsonPrimitive?.contentOrNull,
+                    language = args.requireString("language"),
                     unansweredOnly = args["unansweredOnly"]?.jsonPrimitive?.booleanOrNull ?: false,
-                    searchText = args["searchText"]?.jsonPrimitive?.contentOrNull,
-                    translationLanguage = args["translationLanguage"]?.jsonPrimitive?.contentOrNull
+                    searchText = args.requireString("searchText"),
+                    translationLanguage = args.requireString("translationLanguage")
                 )
-                CallToolResult(content = listOf(TextContent(text = json.encodeToString<ReviewsPage>(page))))
-            }.getOrElse { e -> errorResult("list_reviews failed: ${e.message}") }
+                textResult(json.encodeToString<ReviewsPage>(page))
+            }
         }
     }
 
@@ -106,14 +112,14 @@ object McpServer {
             )
         ) { request ->
             val args = request.arguments
-            runCatching {
-                val packageName = args["packageName"]?.jsonPrimitive?.contentOrNull
-                    ?: return@addTool errorResult("packageName is required")
-                val reviewId = args["reviewId"]?.jsonPrimitive?.contentOrNull
-                    ?: return@addTool errorResult("reviewId is required")
+            safeToolCall("get_review") {
+                val packageName = args.requireString("packageName")
+                    ?: return@safeToolCall errorResult("packageName is required")
+                val reviewId = args.requireString("reviewId")
+                    ?: return@safeToolCall errorResult("reviewId is required")
                 val review = reviewService.getReview(packageName, reviewId)
-                CallToolResult(content = listOf(TextContent(text = json.encodeToString<Review>(review))))
-            }.getOrElse { e -> errorResult("get_review failed: ${e.message}") }
+                textResult(json.encodeToString<Review>(review))
+            }
         }
     }
 
@@ -140,16 +146,16 @@ object McpServer {
             )
         ) { request ->
             val args = request.arguments
-            runCatching {
-                val packageName = args["packageName"]?.jsonPrimitive?.contentOrNull
-                    ?: return@addTool errorResult("packageName is required")
-                val reviewId = args["reviewId"]?.jsonPrimitive?.contentOrNull
-                    ?: return@addTool errorResult("reviewId is required")
-                val replyText = args["replyText"]?.jsonPrimitive?.contentOrNull
-                    ?: return@addTool errorResult("replyText is required")
+            safeToolCall("reply_to_review") {
+                val packageName = args.requireString("packageName")
+                    ?: return@safeToolCall errorResult("packageName is required")
+                val reviewId = args.requireString("reviewId")
+                    ?: return@safeToolCall errorResult("reviewId is required")
+                val replyText = args.requireString("replyText")
+                    ?: return@safeToolCall errorResult("replyText is required")
                 reviewService.replyToReview(packageName, reviewId, replyText)
-                CallToolResult(content = listOf(TextContent(text = "Reply posted successfully.")))
-            }.getOrElse { e -> errorResult("reply_to_review failed: ${e.message}") }
+                textResult("Reply posted successfully.")
+            }
         }
     }
 
@@ -172,14 +178,14 @@ object McpServer {
             )
         ) { request ->
             val args = request.arguments
-            runCatching {
-                val packageName = args["packageName"]?.jsonPrimitive?.contentOrNull
-                    ?: return@addTool errorResult("packageName is required")
-                val reviewId = args["reviewId"]?.jsonPrimitive?.contentOrNull
-                    ?: return@addTool errorResult("reviewId is required")
+            safeToolCall("delete_reply") {
+                val packageName = args.requireString("packageName")
+                    ?: return@safeToolCall errorResult("packageName is required")
+                val reviewId = args.requireString("reviewId")
+                    ?: return@safeToolCall errorResult("reviewId is required")
                 reviewService.deleteReply(packageName, reviewId)
-                CallToolResult(content = listOf(TextContent(text = "Reply deleted successfully.")))
-            }.getOrElse { e -> errorResult("delete_reply failed: ${e.message}") }
+                textResult("Reply deleted successfully.")
+            }
         }
     }
 
@@ -187,4 +193,12 @@ object McpServer {
         content = listOf(TextContent(text = message)),
         isError = true
     )
+
+    private fun textResult(text: String) = CallToolResult(content = listOf(TextContent(text = text)))
+
+    private suspend fun safeToolCall(
+        toolName: String,
+        block: suspend () -> CallToolResult
+    ): CallToolResult = runCatching { block() }
+        .getOrElse { e -> errorResult("$toolName failed: ${e.message}") }
 }

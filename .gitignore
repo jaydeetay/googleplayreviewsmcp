@@ -7,3 +7,4 @@ out/
 local.properties
 *-service-account*.json
 *-credentials*.json
+.claude/settings.local.json

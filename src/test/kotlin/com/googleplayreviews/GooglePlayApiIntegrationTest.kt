@@ -1,5 +1,6 @@
 package com.googleplayreviews
 
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import kotlin.test.assertNotNull
@@ -14,14 +15,14 @@ class GooglePlayApiIntegrationTest {
     private val reviewService = ReviewService(GoogleAuthProvider.fromEnv())
 
     @Test
-    fun `can list reviews`() {
+    fun `can list reviews`() = runBlocking {
         val page = reviewService.listReviews(packageName, maxResults = 5)
         assertNotNull(page)
         assertTrue(page.reviews.isNotEmpty(), "Expected at least one review")
     }
 
     @Test
-    fun `can get a single review`() {
+    fun `can get a single review`() = runBlocking {
         val page = reviewService.listReviews(packageName, maxResults = 1)
         val reviewId = page.reviews.first().reviewId
         val review = reviewService.getReview(packageName, reviewId)
@@ -30,7 +31,7 @@ class GooglePlayApiIntegrationTest {
     }
 
     @Test
-    fun `language filter returns only matching reviews`() {
+    fun `language filter returns only matching reviews`() = runBlocking {
         val page = reviewService.listReviews(packageName, maxResults = 50, language = "en")
         assertTrue(
             page.reviews.all { it.reviewerLanguage.equals("en", ignoreCase = true) },

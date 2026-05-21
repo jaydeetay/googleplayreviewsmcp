@@ -11,6 +11,8 @@ import com.googleplayreviews.models.DeviceInfo
 import com.googleplayreviews.models.Review
 import com.googleplayreviews.models.ReviewsPage
 import java.time.Instant
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class ReviewService(credentials: GoogleCredentials) {
 
@@ -20,7 +22,7 @@ class ReviewService(credentials: GoogleCredentials) {
         HttpCredentialsAdapter(credentials)
     ).setApplicationName("google-play-reviews-mcp").build()
 
-    fun listReviews(
+    suspend fun listReviews(
         packageName: String,
         pageToken: String? = null,
         maxResults: Int = 100,
@@ -28,7 +30,7 @@ class ReviewService(credentials: GoogleCredentials) {
         unansweredOnly: Boolean = false,
         searchText: String? = null,
         translationLanguage: String? = null
-    ): ReviewsPage {
+    ): ReviewsPage = withContext(Dispatchers.IO) {
         val request = publisher.reviews().list(packageName)
             .setMaxResults(maxResults.toLong())
         pageToken?.let { request.setToken(it) }
@@ -38,25 +40,25 @@ class ReviewService(credentials: GoogleCredentials) {
         val allReviews = (response.reviews ?: emptyList<com.google.api.services.androidpublisher.model.Review>()).map { mapReview(it) }
         val filtered = applyFilters(allReviews, language, unansweredOnly, searchText)
 
-        return ReviewsPage(
+        ReviewsPage(
             reviews = filtered,
             nextPageToken = response.tokenPagination?.nextPageToken
         )
     }
 
-    fun getReview(packageName: String, reviewId: String): Review {
+    suspend fun getReview(packageName: String, reviewId: String): Review = withContext(Dispatchers.IO) {
         val response = publisher.reviews().get(packageName, reviewId).execute()
-        return mapReview(response)
+        mapReview(response)
     }
 
-    fun replyToReview(packageName: String, reviewId: String, replyText: String) {
+    suspend fun replyToReview(packageName: String, reviewId: String, replyText: String): Unit = withContext(Dispatchers.IO) {
         val replyRequest = ReviewsReplyRequest().setReplyText(replyText)
         publisher.reviews().reply(packageName, reviewId, replyRequest).execute()
     }
 
-    fun deleteReply(packageName: String, reviewId: String) {
-        // The Play Developer API has no dedicated delete-reply endpoint.
-        // Posting an empty string clears the reply.
+    suspend fun deleteReply(packageName: String, reviewId: String) {
+        // The Play Developer API client library (v3-rev20241217) does not expose a
+        // deleteReply endpoint; posting an empty string is the documented workaround.
         replyToReview(packageName, reviewId, "")
     }
 
@@ -79,15 +81,19 @@ class ReviewService(credentials: GoogleCredentials) {
         val originalText = userComment?.originalText ?: userComment?.text ?: ""
         val translatedText = if (userComment?.originalText != null) userComment.text else null
 
+        // The Play Developer API exposes only `lastModified` on the user comment,
+        // which reflects the most recent edit time. There is no separate creation
+        // timestamp available via this API; both fields carry the same value.
+        val lastModifiedIso = userComment?.lastModified?.seconds
+            ?.let { Instant.ofEpochSecond(it).toString() } ?: ""
+
         return Review(
             reviewId = apiReview.reviewId ?: "",
             authorName = apiReview.authorName ?: "Unknown",
             rating = userComment?.starRating ?: 0,
             reviewerLanguage = userComment?.reviewerLanguage ?: "",
-            createTime = userComment?.lastModified?.seconds
-                ?.let { Instant.ofEpochSecond(it).toString() } ?: "",
-            updateTime = userComment?.lastModified?.seconds
-                ?.let { Instant.ofEpochSecond(it).toString() } ?: "",
+            createTime = lastModifiedIso,
+            updateTime = lastModifiedIso,
             originalText = originalText,
             translatedText = translatedText,
             deviceInfo = metadata?.let {
