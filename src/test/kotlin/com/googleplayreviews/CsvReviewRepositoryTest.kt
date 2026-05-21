@@ -176,4 +176,29 @@ class CsvReviewRepositoryTest {
         val result = repo.listReviews("com.example.app", limit = 0)
         assertEquals(3, result.reviews.size)
     }
+
+    @Test
+    fun `language filter is applied to CSV reviews`() = runBlocking {
+        writeCsv("com.example.app", "202306", listOf(
+            FixtureRow(reviewId = "en-1", language = "en"),
+            FixtureRow(reviewId = "fr-1", language = "fr"),
+            FixtureRow(reviewId = "en-2", language = "en")
+        ))
+        val repo = CsvReviewRepository(tempDir)
+        val result = repo.listReviews("com.example.app", language = "en")
+        assertEquals(2, result.reviews.size)
+        assert(result.reviews.all { it.reviewerLanguage == "en" })
+    }
+
+    @Test
+    fun `searchText filter is applied to CSV reviews`() = runBlocking {
+        writeCsv("com.example.app", "202306", listOf(
+            FixtureRow(reviewId = "match", text = "crashes constantly"),
+            FixtureRow(reviewId = "no-match", text = "love this app")
+        ))
+        val repo = CsvReviewRepository(tempDir)
+        val result = repo.listReviews("com.example.app", searchText = "crash")
+        assertEquals(1, result.reviews.size)
+        assertEquals("match", result.reviews[0].reviewId)
+    }
 }

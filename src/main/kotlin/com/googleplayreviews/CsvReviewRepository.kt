@@ -109,7 +109,7 @@ class CsvReviewRepository(private val reviewsDir: File) : HistoricalReviewSource
         val replyDate = row["Developer Reply Date and Time"].orEmpty()
         return Review(
             reviewId = reviewId,
-            authorName = "Unknown",
+            authorName = "Unknown", // CSV exports do not include reviewer name
             rating = row["Star Rating"]?.toIntOrNull() ?: 0,
             reviewerLanguage = row["Reviewer Language"].orEmpty(),
             createTime = row["Review Submit Date and Time"].orEmpty(),
