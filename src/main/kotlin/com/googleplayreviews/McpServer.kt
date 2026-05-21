@@ -20,7 +20,7 @@ object McpServer {
 
     private val json = Json { encodeDefaults = false }
 
-    fun create(reviewService: ReviewService): Server {
+    fun create(reviewService: ReviewService, historicalSource: HistoricalReviewSource? = null): Server {
         val server = Server(
             serverInfo = Implementation(name = "google-play-reviews", version = "1.0.0"),
             options = ServerOptions(
@@ -31,6 +31,7 @@ object McpServer {
         registerGetReview(server, reviewService)
         registerReplyToReview(server, reviewService)
         registerDeleteReply(server, reviewService)
+        if (historicalSource != null) registerListHistoricalReviews(server, historicalSource)
         return server
     }
 
@@ -188,6 +189,65 @@ object McpServer {
                     ?: return@safeToolCall errorResult("reviewId is required")
                 reviewService.deleteReply(packageName, reviewId)
                 textResult("Reply deleted successfully.")
+            }
+        }
+    }
+
+    private fun registerListHistoricalReviews(server: Server, source: HistoricalReviewSource) {
+        server.addTool(
+            name = "list_historical_reviews",
+            description = "Fetch reviews from locally-downloaded Google Play CSV reports. " +
+                "Reads monthly CSV files from the PLAY_REVIEWS_DIR directory. " +
+                "Supports date range filtering (startDate/endDate) in addition to the same " +
+                "filters available on list_reviews. Returns a ReviewsPage with nextPageToken always null.",
+            inputSchema = Tool.Input(
+                properties = buildJsonObject {
+                    putJsonObject("packageName") {
+                        put("type", "string")
+                        put("description", "App package name, e.g. com.example.app")
+                    }
+                    putJsonObject("startDate") {
+                        put("type", "string")
+                        put("description", "Inclusive start date in ISO format, e.g. 2023-01-01")
+                    }
+                    putJsonObject("endDate") {
+                        put("type", "string")
+                        put("description", "Inclusive end date in ISO format, e.g. 2023-12-31")
+                    }
+                    putJsonObject("limit") {
+                        put("type", "integer")
+                        put("description", "Max reviews to return (default 100); 0 means no limit")
+                    }
+                    putJsonObject("language") {
+                        put("type", "string")
+                        put("description", "Filter by BCP-47 reviewer language")
+                    }
+                    putJsonObject("unansweredOnly") {
+                        put("type", "boolean")
+                        put("description", "If true, only return reviews with no developer reply")
+                    }
+                    putJsonObject("searchText") {
+                        put("type", "string")
+                        put("description", "Case-insensitive substring match against review text")
+                    }
+                },
+                required = listOf("packageName")
+            )
+        ) { request ->
+            val args = request.arguments
+            safeToolCall("list_historical_reviews") {
+                val packageName = args.requireString("packageName")
+                    ?: return@safeToolCall errorResult("packageName is required")
+                val page = source.listReviews(
+                    packageName = packageName,
+                    startDate = args.requireString("startDate"),
+                    endDate = args.requireString("endDate"),
+                    limit = args["limit"]?.jsonPrimitive?.intOrNull ?: 100,
+                    language = args.requireString("language"),
+                    unansweredOnly = args["unansweredOnly"]?.jsonPrimitive?.booleanOrNull ?: false,
+                    searchText = args.requireString("searchText")
+                )
+                textResult(json.encodeToString<ReviewsPage>(page))
             }
         }
     }
