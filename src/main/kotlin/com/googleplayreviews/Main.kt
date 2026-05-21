@@ -1,6 +1,7 @@
 package com.googleplayreviews
 
 import io.modelcontextprotocol.kotlin.sdk.server.StdioServerTransport
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import kotlinx.io.asSource
 import kotlinx.io.asSink
@@ -21,5 +22,8 @@ fun main(): Unit = runBlocking {
         outputStream = System.out.asSink().buffered()
     )
 
+    val done = CompletableDeferred<Unit>()
+    server.onClose { done.complete(Unit) }
     server.connect(transport)
+    done.await()
 }

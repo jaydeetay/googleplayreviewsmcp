@@ -1008,6 +1008,13 @@ claude mcp add google-play-reviews \
   --env "GOOGLE_SERVICE_ACCOUNT_JSON=$(cat /path/to/your-service-account-key.json)"
 ```
 
+Actually the command above (given by Claude) is bullshit.  The correct command is:
+```bash
+claude mcp add google-play-reviews -e "GOOGLE_SERVICE_ACCOUNT_JSON=$(cat ~/Downloads/sky-map-1286-2765d0445034.json)" -- java -jar /Users/jdt/Code/prototyping/googleplayreviewsmcp/build/libs/googleplayreviewsmcp-1.0.0.jar
+
+```
+where the json file is downloaded from the google api console.
+
 Or manually add to `~/.claude/mcp_servers.json`:
 
 ```json
