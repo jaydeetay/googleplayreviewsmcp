@@ -6,6 +6,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.io.asSource
 import kotlinx.io.asSink
 import kotlinx.io.buffered
+import java.io.File
 
 fun main(): Unit = runBlocking {
     val credentials = try {
@@ -15,8 +16,18 @@ fun main(): Unit = runBlocking {
         return@runBlocking
     }
 
+    val historicalSource = System.getenv("PLAY_REVIEWS_DIR")?.let { dirPath ->
+        val dir = File(dirPath)
+        if (dir.isDirectory) {
+            CsvReviewRepository(dir)
+        } else {
+            System.err.println("Warning: PLAY_REVIEWS_DIR=$dirPath is not a valid directory — list_historical_reviews tool will not be available")
+            null
+        }
+    }
+
     val reviewService = ReviewService(credentials)
-    val server = McpServer.create(reviewService)
+    val server = McpServer.create(reviewService, historicalSource)
     val transport = StdioServerTransport(
         inputStream = System.`in`.asSource().buffered(),
         outputStream = System.out.asSink().buffered()
