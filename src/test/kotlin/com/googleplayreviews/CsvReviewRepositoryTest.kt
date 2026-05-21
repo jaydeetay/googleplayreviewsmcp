@@ -121,4 +121,59 @@ class CsvReviewRepositoryTest {
         assertEquals(1, result.reviews.size)
         assertEquals("abc-123", result.reviews[0].reviewId)
     }
+
+    @Test
+    fun `startDate excludes reviews before that date`() = runBlocking {
+        writeCsv("com.example.app", "202306", listOf(
+            FixtureRow(reviewId = "old", submitDate = "2023-06-01T00:00:00Z"),
+            FixtureRow(reviewId = "new", submitDate = "2023-06-20T00:00:00Z")
+        ))
+        val repo = CsvReviewRepository(tempDir)
+        val result = repo.listReviews("com.example.app", startDate = "2023-06-15")
+        assertEquals(1, result.reviews.size)
+        assertEquals("new", result.reviews[0].reviewId)
+    }
+
+    @Test
+    fun `endDate excludes reviews after that date`() = runBlocking {
+        writeCsv("com.example.app", "202306", listOf(
+            FixtureRow(reviewId = "early", submitDate = "2023-06-05T00:00:00Z"),
+            FixtureRow(reviewId = "late", submitDate = "2023-06-25T00:00:00Z")
+        ))
+        val repo = CsvReviewRepository(tempDir)
+        val result = repo.listReviews("com.example.app", endDate = "2023-06-10")
+        assertEquals(1, result.reviews.size)
+        assertEquals("early", result.reviews[0].reviewId)
+    }
+
+    @Test
+    fun `file outside date range is skipped entirely`() = runBlocking {
+        writeCsv("com.example.app", "202301", listOf(FixtureRow(reviewId = "jan")))
+        writeCsv("com.example.app", "202306", listOf(FixtureRow(reviewId = "jun")))
+        val repo = CsvReviewRepository(tempDir)
+        val result = repo.listReviews("com.example.app", startDate = "2023-06-01", endDate = "2023-06-30")
+        assertEquals(1, result.reviews.size)
+        assertEquals("jun", result.reviews[0].reviewId)
+    }
+
+    @Test
+    fun `limit stops reading after enough reviews are collected`() = runBlocking {
+        writeCsv("com.example.app", "202305", listOf(
+            FixtureRow(reviewId = "r1"), FixtureRow(reviewId = "r2"), FixtureRow(reviewId = "r3")
+        ))
+        val repo = CsvReviewRepository(tempDir)
+        val result = repo.listReviews("com.example.app", limit = 2)
+        assertEquals(2, result.reviews.size)
+        assertNull(result.nextPageToken)
+    }
+
+    @Test
+    fun `limit zero returns all reviews`() = runBlocking {
+        writeCsv("com.example.app", "202305", listOf(
+            FixtureRow(reviewId = "r1"), FixtureRow(reviewId = "r2"), FixtureRow(reviewId = "r3")
+        ))
+        val repo = CsvReviewRepository(tempDir)
+        val result = repo.listReviews("com.example.app", limit = 0)
+        assertEquals(3, result.reviews.size)
+    }
 }
