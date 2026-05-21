@@ -37,9 +37,13 @@ object McpServer {
     private fun registerListReviews(server: Server, reviewService: ReviewService) {
         server.addTool(
             name = "list_reviews",
-            description = "Fetch reviews for a Google Play app with optional filters. " +
-                "Automatically paginates through API pages until the requested number of " +
-                "filtered results is accumulated or pages are exhausted.",
+            description = "Fetch reviews for a Google Play app. The server auto-paginates the Play Developer API " +
+                "(which returns ~12 reviews per page) until `limit` filtered results are collected or " +
+                "all pages are exhausted. Filters (language, unansweredOnly, searchText) are applied " +
+                "client-side; only matching reviews count toward `limit`. " +
+                "When the limit fires mid-page, reviews beyond the limit on that page are not returned. " +
+                "The nextPageToken in the response points to the next unfetched API page — resuming " +
+                "from it skips those unreturned reviews. Use limit=0 to fetch all reviews without truncation.",
             inputSchema = Tool.Input(
                 properties = buildJsonObject {
                     putJsonObject("packageName") {
@@ -48,7 +52,7 @@ object McpServer {
                     }
                     putJsonObject("pageToken") {
                         put("type", "string")
-                        put("description", "Pagination token from a previous list_reviews response")
+                        put("description", "Resume pagination from this API token (returned as nextPageToken in a previous response). Note: if the previous call hit its limit mid-page, some reviews from that page were not returned.")
                     }
                     putJsonObject("limit") {
                         put("type", "integer")
