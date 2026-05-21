@@ -69,7 +69,8 @@ class CsvReviewRepository(private val reviewsDir: File) : HistoricalReviewSource
     }
 
     private fun parseCsv(file: File): List<Map<String, String>> {
-        val content = file.readText(Charsets.UTF_16)
+        val raw = file.readText(Charsets.UTF_16LE)
+        val content = if (raw.startsWith('﻿')) raw.substring(1) else raw
         val lines = content.lines().filter { it.isNotBlank() }
         if (lines.size < 2) return emptyList()
         val headers = parseCsvRow(lines[0])
@@ -83,12 +84,20 @@ class CsvReviewRepository(private val reviewsDir: File) : HistoricalReviewSource
         val result = mutableListOf<String>()
         val current = StringBuilder()
         var inQuotes = false
-        for (c in line) {
+        var i = 0
+        while (i < line.length) {
+            val c = line[i]
             when {
+                c == '"' && inQuotes && i + 1 < line.length && line[i + 1] == '"' -> {
+                    current.append('"')
+                    i += 2
+                    continue
+                }
                 c == '"' -> inQuotes = !inQuotes
                 c == ',' && !inQuotes -> { result.add(current.toString()); current.clear() }
                 else -> current.append(c)
             }
+            i++
         }
         result.add(current.toString())
         return result
