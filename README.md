@@ -4,3 +4,4 @@ NOTE: Google's APIs truly suck - this one only returns reviews from the last 7 d
 
 https://support.google.com/googleplay/android-developer/thread/239806165/google-play-api-list-reviews-only-returns-last-7-days-of-reviews-and-does-not-return-pagination
 
+That said, if you can obtain the review ID you can still use the API to read it and to post replies.
