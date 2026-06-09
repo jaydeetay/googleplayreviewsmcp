@@ -4,7 +4,9 @@ NOTE: Google's APIs truly suck - this one only returns reviews from the last 7 d
 
 https://support.google.com/googleplay/android-developer/thread/239806165/google-play-api-list-reviews-only-returns-last-7-days-of-reviews-and-does-not-return-pagination
 
-That said, if you can obtain the review ID you can still use the API to read it and to post replies even to old reviews.  The MCP server can deal with this by being pointed at a dump of the csv files you can download from the Play Store.  TODO: make it just get them from Cloud.
+That said, if you can obtain the review ID you can still use the API to read it and to post replies even to old reviews.  The MCP server can deal with this by being pointed at a dump of the csv files you can download from the Play Store.  But to be honest the LLM can do a reasonable job if you just tell it where the dump is - it'll do all the grepping itself without the need for a server.
+
+TODO: make it just get them from Cloud.
 
 Needs a jvm as it's kotlin.
 
